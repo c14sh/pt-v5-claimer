@@ -51,46 +51,51 @@ library LinearVRGDALib {
       .unwrap();
     int256 decayConstantUnwrapped = _decayConstant.unwrap();
     unchecked {
-      // Check if next multiplication will have overflow. If so, return max uint.
-      if (
-        targetTimeUnwrapped > 0 && decayConstantUnwrapped > type(int256).max / targetTimeUnwrapped
-      ) {
-        return type(uint256).max;
-      }
-      // Check if next multiplication will have a negative overflow. If so, return zero.
-      if (
-        targetTimeUnwrapped < 0 && decayConstantUnwrapped > type(int256).min / targetTimeUnwrapped
-      ) {
-        return 0;
-      }
       int256 exp = unsafeWadMul(decayConstantUnwrapped, targetTimeUnwrapped);
-
-      // Check if exponent is at the max for the `wadExp` function. If so, limit at max uint.
-      if (exp >= 135305999368893231589) {
-        return type(uint256).max;
-      }
       int256 expResult = wadExp(exp);
+      return uint256(unsafeWadMul(targetPriceInt, expResult));
 
-      // Return zero if expResult is zero. This prevents zero division later on.
-      if (expResult == 0) {
-        return 0;
-      }
+      ////////////////////////////
+      // // Check if next multiplication will have overflow. If so, return max uint.
+      // if (
+      //   targetTimeUnwrapped > 0 && decayConstantUnwrapped > type(int256).max / targetTimeUnwrapped
+      // ) {
+      //   return type(uint256).max;
+      // }
+      // // Check if next multiplication will have a negative overflow. If so, return zero.
+      // if (
+      //   targetTimeUnwrapped < 0 && decayConstantUnwrapped > type(int256).min / targetTimeUnwrapped
+      // ) {
+      //   return 0;
+      // }
+      // int256 exp = unsafeWadMul(decayConstantUnwrapped, targetTimeUnwrapped);
 
-      // If exponential result is greater than 1, then don't worry about extra precision to avoid extra risk of overflow
-      if (expResult > 1e18) {
-        // Check if multiplication will overflow and return max uint if it will.
-        if (targetPriceInt > type(int256).max / expResult) {
-          return type(uint256).max;
-        }
-        return uint256(unsafeWadMul(targetPriceInt, expResult));
-      } else {
-        // Check if multiplication will overflow and return max uint if it will.
-        int256 extraPrecisionExpResult = int128(expResult * 1e18);
-        if (targetPriceInt > type(int256).max / extraPrecisionExpResult) {
-          return type(uint256).max;
-        }
-        return uint256(unsafeWadMul(targetPriceInt, extraPrecisionExpResult)) / 1e18;
-      }
+      // // Check if exponent is at the max for the `wadExp` function. If so, limit at max uint.
+      // if (exp >= 135305999368893231589) {
+      //   return type(uint256).max;
+      // }
+      // int256 expResult = wadExp(exp);
+
+      // // Return zero if expResult is zero. This prevents zero division later on.
+      // if (expResult == 0) {
+      //   return 0;
+      // }
+
+      // // If exponential result is greater than 1, then don't worry about extra precision to avoid extra risk of overflow
+      // if (expResult > 1e18) {
+      //   // Check if multiplication will overflow and return max uint if it will.
+      //   if (targetPriceInt > type(int256).max / expResult) {
+      //     return type(uint256).max;
+      //   }
+      //   return uint256(unsafeWadMul(targetPriceInt, expResult));
+      // } else {
+      //   // Check if multiplication will overflow and return max uint if it will.
+      //   int256 extraPrecisionExpResult = int128(expResult * 1e18);
+      //   if (targetPriceInt > type(int256).max / extraPrecisionExpResult) {
+      //     return type(uint256).max;
+      //   }
+      //   return uint256(unsafeWadMul(targetPriceInt, extraPrecisionExpResult)) / 1e18;
+      // }
     }
   }
 

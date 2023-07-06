@@ -81,7 +81,7 @@ contract Claimer is Multicall {
   /// @notice Computes the total fees for the given number of claims
   /// @param _claimCount The number of claims
   /// @return The total fees for those claims
-  function computeTotalFees(uint8 _tier, uint _claimCount) external view returns (uint256) {
+  function computeTotalFees(uint8 _tier, uint _claimCount) external returns (uint256) {
     return
       _computeFeePerClaim(_computeMaxFee(_tier, prizePool.numberOfTiers()), _claimCount) *
       _claimCount;
@@ -91,14 +91,14 @@ contract Claimer is Multicall {
   /// @param _maxFee the maximum fee that can be charged
   /// @param _claimCount the number of claims to check
   /// @return The fees for the claims
-  function computeFeePerClaim(uint256 _maxFee, uint _claimCount) external view returns (uint256) {
+  function computeFeePerClaim(uint256 _maxFee, uint _claimCount) external returns (uint256) {
     return _computeFeePerClaim(_maxFee, _claimCount);
   }
 
   /// @notice Computes the total fees for the given number of claims
   /// @param _claimCount The number of claims to check
   /// @return The total fees for the claims
-  function _computeFeePerClaim(uint256 _maxFee, uint _claimCount) internal view returns (uint256) {
+  function _computeFeePerClaim(uint256 _maxFee, uint _claimCount) internal returns (uint256) {
     if (_claimCount == 0) {
       return 0;
     }
@@ -158,14 +158,14 @@ contract Claimer is Multicall {
   /// @param _sold The number of prizes that were claimed
   /// @param _maxFee The maximum fee that can be charged
   /// @return The fee to charge for the next claim
-  function _computeFeeForNextClaim(
+  function getVRGDAPrice(
     uint256 _minimumFee,
     SD59x18 _decayConstant,
     SD59x18 _perTimeUnit,
     uint256 _elapsed,
     uint256 _sold,
     uint256 _maxFee
-  ) internal pure returns (uint256) {
+  ) public pure returns (uint256) {
     uint256 fee = LinearVRGDALib.getVRGDAPrice(
       _minimumFee,
       _elapsed,
@@ -174,5 +174,36 @@ contract Claimer is Multicall {
       _decayConstant
     );
     return fee > _maxFee ? _maxFee : fee;
+  }
+
+  /// @notice Computes the fee for the next claim
+  /// @param _minimumFee The minimum fee that should be charged
+  /// @param _decayConstant The VRGDA decay constant
+  /// @param _perTimeUnit The num to be claimed per second
+  /// @param _elapsed The number of seconds that have elapsed
+  /// @param _sold The number of prizes that were claimed
+  /// @param _maxFee The maximum fee that can be charged
+  /// @return The fee to charge for the next claim
+  function _computeFeeForNextClaim(
+    uint256 _minimumFee,
+    SD59x18 _decayConstant,
+    SD59x18 _perTimeUnit,
+    uint256 _elapsed,
+    uint256 _sold,
+    uint256 _maxFee
+  ) internal returns (uint256) {
+    (bool success, bytes memory returnData) = address(this).delegatecall(
+      abi.encodeWithSelector(
+        this.getVRGDAPrice.selector,
+        _minimumFee,
+        _decayConstant,
+        _perTimeUnit,
+        _elapsed,
+        _sold,
+        _maxFee
+      )
+    );
+
+    return abi.decode(returnData, (uint256));
   }
 }
