@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import { SD59x18 } from "prb-math/SD59x18.sol";
-import { UD2x18 } from "prb-math/UD2x18.sol";
-import { UD60x18 } from "prb-math/UD60x18.sol";
-import { PrizePool } from "v5-prize-pool/PrizePool.sol";
-import { Multicall } from "openzeppelin/utils/Multicall.sol";
+import {SD59x18} from "prb-math/SD59x18.sol";
+import {UD2x18} from "prb-math/UD2x18.sol";
+import {UD60x18} from "prb-math/UD60x18.sol";
+import {PrizePool} from "v5-prize-pool/PrizePool.sol";
+import {Multicall} from "openzeppelin/utils/Multicall.sol";
 
-import { LinearVRGDALib } from "./lib/LinearVRGDALib.sol";
-import { Vault } from "v5-vault/Vault.sol";
+import {LinearVRGDALib} from "./lib/LinearVRGDALib.sol";
+import {Vault} from "v5-vault/Vault.sol";
 
 /// @title Variable Rate Gradual Dutch Auction (VRGDA) Claimer
 /// @author PoolTogether Inc. Team
 /// @notice This contract uses a variable rate gradual dutch auction to inventivize prize claims on behalf of others
 contract Claimer is Multicall {
-
     /// @notice The Prize Pool that this Claimer is claiming prizes for
     PrizePool public immutable prizePool;
 
@@ -44,7 +43,13 @@ contract Claimer is Multicall {
     ) {
         prizePool = _prizePool;
         maxFeePortionOfPrize = _maxFeePortionOfPrize;
-        decayConstant = LinearVRGDALib.getDecayConstant(LinearVRGDALib.getMaximumPriceDeltaScale(_minimumFee, _maximumFee, _timeToReachMaxFee));
+        decayConstant = LinearVRGDALib.getDecayConstant(
+            LinearVRGDALib.getMaximumPriceDeltaScale(
+                _minimumFee,
+                _maximumFee,
+                _timeToReachMaxFee
+            )
+        );
         minimumFee = _minimumFee;
         timeToReachMaxFee = _timeToReachMaxFee;
     }
@@ -63,15 +68,25 @@ contract Claimer is Multicall {
         uint32[][] calldata prizeIndices,
         address _feeRecipient
     ) external returns (uint256 totalFees) {
-
         uint256 claimCount;
         for (uint i = 0; i < winners.length; i++) {
             claimCount += prizeIndices[i].length;
         }
 
-        uint96 feePerClaim = uint96(_computeFeePerClaim(_computeMaxFee(tier, prizePool.numberOfTiers()), claimCount));
+        uint96 feePerClaim = uint96(
+            _computeFeePerClaim(
+                _computeMaxFee(tier, prizePool.numberOfTiers()),
+                claimCount
+            )
+        );
 
-        vault.claimPrizes(tier, winners, prizeIndices, feePerClaim, _feeRecipient);
+        vault.claimPrizes(
+            tier,
+            winners,
+            prizeIndices,
+            feePerClaim,
+            _feeRecipient
+        );
 
         return feePerClaim * claimCount;
     }
@@ -79,29 +94,53 @@ contract Claimer is Multicall {
     /// @notice Computes the total fees for the given number of claims
     /// @param _claimCount The number of claims
     /// @return The total fees for those claims
-    function computeTotalFees(uint8 _tier, uint _claimCount) external view returns (uint256) {
-        return _computeFeePerClaim(_computeMaxFee(_tier, prizePool.numberOfTiers()), _claimCount) * _claimCount;
+    function computeTotalFees(
+        uint8 _tier,
+        uint _claimCount
+    ) external view returns (uint256) {
+        return
+            _computeFeePerClaim(
+                _computeMaxFee(_tier, prizePool.numberOfTiers()),
+                _claimCount
+            ) * _claimCount;
     }
 
-    function computeFeePerClaim(uint256 _maxFee, uint _claimCount) external view returns (uint256) {
+    function computeFeePerClaim(
+        uint256 _maxFee,
+        uint _claimCount
+    ) external view returns (uint256) {
         return _computeFeePerClaim(_maxFee, _claimCount);
     }
 
     /// @notice Computes the total fees for the given number of claims
     /// @param _claimCount The number of claims to check
     /// @return The total fees for the claims
-    function _computeFeePerClaim(uint256 _maxFee, uint _claimCount) internal view returns (uint256) {
+    function _computeFeePerClaim(
+        uint256 _maxFee,
+        uint _claimCount
+    ) internal view returns (uint256) {
         if (_claimCount == 0) {
             return 0;
         }
-        SD59x18 perTimeUnit = LinearVRGDALib.getPerTimeUnit(prizePool.estimatedPrizeCount(), timeToReachMaxFee);
-        uint256 elapsed = block.timestamp - (prizePool.lastCompletedDrawAwardedAt());
+        SD59x18 perTimeUnit = LinearVRGDALib.getPerTimeUnit(
+            prizePool.estimatedPrizeCount(),
+            timeToReachMaxFee
+        );
+        uint256 elapsed = block.timestamp -
+            (prizePool.lastClosedDrawAwardedAt());
         uint256 fee;
 
         for (uint i = 0; i < _claimCount; i++) {
-            fee += _computeFeeForNextClaim(minimumFee, decayConstant, perTimeUnit, elapsed, prizePool.claimCount() + i, _maxFee);
+            fee += _computeFeeForNextClaim(
+                minimumFee,
+                decayConstant,
+                perTimeUnit,
+                elapsed,
+                prizePool.claimCount() + i,
+                _maxFee
+            );
         }
-        
+
         return fee / _claimCount;
     }
 
@@ -115,9 +154,13 @@ contract Claimer is Multicall {
     /// @param _tier The tier to compute the max fee for
     /// @param _numTiers The total number of tiers
     /// @return The maximum fee that will be charged for a prize claim for the given tier
-    function _computeMaxFee(uint8 _tier, uint8 _numTiers) internal view returns (uint256) {
+    function _computeMaxFee(
+        uint8 _tier,
+        uint8 _numTiers
+    ) internal view returns (uint256) {
         uint8 _canaryTier = _numTiers - 1;
-        if (_tier != _canaryTier) { // canary tier
+        if (_tier != _canaryTier) {
+            // canary tier
             return _computeMaxFee(prizePool.getTierPrizeSize(_canaryTier - 1));
         } else {
             return _computeMaxFee(prizePool.getTierPrizeSize(_canaryTier));
@@ -128,7 +171,10 @@ contract Claimer is Multicall {
     /// @return The maximum fee that can be charged
     function _computeMaxFee(uint256 _prize) internal view returns (uint256) {
         // compute the maximum fee that can be charged
-        return UD60x18.unwrap(maxFeePortionOfPrize.intoUD60x18().mul(UD60x18.wrap(_prize)));
+        return
+            UD60x18.unwrap(
+                maxFeePortionOfPrize.intoUD60x18().mul(UD60x18.wrap(_prize))
+            );
     }
 
     /// @notice Computes the fee for the next claim
@@ -147,8 +193,13 @@ contract Claimer is Multicall {
         uint256 _sold,
         uint256 _maxFee
     ) internal pure returns (uint256) {
-        uint256 fee = LinearVRGDALib.getVRGDAPrice(_minimumFee, _elapsed, _sold, _perTimeUnit, _decayConstant);
+        uint256 fee = LinearVRGDALib.getVRGDAPrice(
+            _minimumFee,
+            _elapsed,
+            _sold,
+            _perTimeUnit,
+            _decayConstant
+        );
         return fee > _maxFee ? _maxFee : fee;
     }
-
 }
